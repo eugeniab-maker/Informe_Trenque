@@ -149,9 +149,24 @@ main { max-width: 1240px; margin: 0 auto; padding-block: 24px 44px; padding-inli
 .fbtn.min[aria-pressed="false"] { color: var(--yellow-ink); border-color: var(--yellow-ink); }
 .fbtn.min[aria-pressed="true"] { --c: var(--yellow-ink); }
 .pend-groups { display: flex; flex-direction: column; gap: 10px; }
-.pend-group { padding: 14px 16px 6px; }
-.pend-group h3 { font-size: 16px; font-weight: 800; display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 4px; }
-.pend-group h3 span { font-size: 12px; font-weight: 700; color: var(--gray); font-family: var(--f-title); }
+.pend-group { padding: 0; }
+.pend-group summary { list-style: none; cursor: pointer; padding: 16px 16px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px 16px; align-items: center; }
+.pend-group summary::-webkit-details-marker { display: none; }
+.pend-group summary:hover { background: var(--cream); }
+.pend-group h3 { font-size: 17px; font-weight: 800; }
+.pend-break { grid-column: 1; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--dgray); }
+.pend-break .it { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.pend-break b { font-family: var(--f-title); font-weight: 700; color: var(--black); }
+.pend-count { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+.pend-count b { font-family: var(--f-title); font-weight: 800; font-size: 30px; color: var(--c-cert); }
+.pend-count span { font-family: var(--f-title); font-weight: 700; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--gray); margin-top: 3px; }
+.chev { grid-column: 3; grid-row: 1 / span 2; width: 30px; height: 30px; border: 1.5px solid var(--border); border-radius: var(--r); display: grid; place-items: center; background: var(--white); transition: transform .15s ease; }
+.chev svg { width: 12px; height: 12px; }
+.pend-group[open] .chev { transform: rotate(180deg); }
+.pend-group[open] summary { border-bottom: 2px solid var(--cream2); }
+.pend-group .ind { padding: 2px 16px 8px; }
+.pend-tools { display: flex; justify-content: flex-end; gap: 8px; margin: -4px 0 10px; }
+.linkbtn { background: none; border: 0; padding: 2px 0; cursor: pointer; font-family: var(--f-title); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--c-cert); }
 .empty { padding: 18px; text-align: center; color: var(--dgray); font-size: 13px; }
 
 /* Lista de indicadores (pendientes y panel) */
@@ -273,8 +288,9 @@ main { max-width: 1240px; margin: 0 auto; padding-block: 24px 44px; padding-inli
   </section>
 
   <section aria-labelledby="pd-h">
-    <div class="sec-label" id="pd-h">Pendientes <span class="aside">Incompletos, en Consultar o con criterio mínimo sin validar</span></div>
+    <div class="sec-label" id="pd-h">Pendientes <span class="aside">Incompletos, en Consultar, sin respuesta o con criterio mínimo sin validar</span></div>
     <div class="filters" id="pd-filters"></div>
+    <div class="pend-tools"><button type="button" class="linkbtn" data-pexp="1">Desplegar todos</button><button type="button" class="linkbtn" data-pexp="0">Colapsar todos</button></div>
     <div class="pend-groups" id="pd-list"></div>
   </section>
 
@@ -361,7 +377,7 @@ main { max-width: 1240px; margin: 0 auto; padding-block: 24px 44px; padding-inli
     try { return d.toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch (e) { return d.toISOString(); }
   }
 
-  var state = { model: null, source: "", pdFilter: "all", panelAxis: null, panelFilter: "all" };
+  var state = { model: null, source: "", pdOpen: {}, pdFilter: "all", panelAxis: null, panelFilter: "all" };
 
   function buildModel(byTab, skipped) {
     var tabNames = Object.keys(byTab);
@@ -461,20 +477,31 @@ main { max-width: 1240px; margin: 0 auto; padding-block: 24px 44px; padding-inli
     var out = [];
     if (r.state === "Incompleto") out.push("inc");
     if (r.state === "Consultar") out.push("con");
+    if (r.state === "Sin respuesta") out.push("sin");
     if (r.crit && r.state !== "Validado") out.push("min");
     return out;
   }
   function renderPend() {
-    var m = state.model, cnt = { all: 0, inc: 0, con: 0, min: 0 };
+    var m = state.model, cnt = { all: 0, inc: 0, con: 0, sin: 0, min: 0 };
     m.axes.forEach(function (a) { a.rows.forEach(function (r) { var rs = pendReasons(r); if (rs.length) { cnt.all++; rs.forEach(function (k) { cnt[k]++; }); } }); });
-    var F = [["all", "Todos", "var(--c-cert)"], ["inc", "Incompleto", "var(--st-inc)"], ["con", "Consultar", "var(--st-con)"], ["min", "Criterio mínimo sin validar", ""]];
+    var F = [["all", "Todos", "var(--c-cert)"], ["inc", "Incompleto", "var(--st-inc)"], ["con", "Consultar", "var(--st-con)"], ["sin", "Sin respuesta", "var(--st-sin)"], ["min", "Criterio mínimo sin validar", ""]];
     document.getElementById("pd-filters").innerHTML = F.map(function (f) {
       return '<button type="button" class="fbtn' + (f[0] === "min" ? " min" : "") + '" data-pf="' + f[0] + '" aria-pressed="' + (state.pdFilter === f[0]) + '"' + (f[2] ? ' style="--c:' + f[2] + '"' : "") + ">" + f[1] + ' <span class="n">' + cnt[f[0]] + "</span></button>";
     }).join("");
     var html = m.axes.map(function (a) {
       var rows = a.rows.filter(function (r) { var rs = pendReasons(r); return rs.length && (state.pdFilter === "all" || rs.indexOf(state.pdFilter) >= 0); });
       if (!rows.length) return "";
-      return '<div class="card pend-group"><h3>' + esc(a.name) + "<span>" + rows.length + (rows.length === 1 ? " pendiente" : " pendientes") + '</span></h3><ul class="ind">' + rows.map(function (r) { return indHTML(r); }).join("") + "</ul></div>";
+      var by = {};
+      rows.forEach(function (r) { by[r.state] = (by[r.state] || 0) + 1; });
+      var nMin = rows.filter(function (r) { return r.crit && r.state !== "Validado"; }).length;
+      var brk = stateList(by).filter(function (s) { return s.n; }).map(function (s) {
+        return '<span class="it"><span class="sw" style="background:' + s.color + '"></span>' + esc(s.key) + ' <b class="num">' + s.n + "</b></span>";
+      }).join("") + (nMin ? '<span class="chip chip-min">' + MIN_ICON + "Criterio mínimo sin validar " + nMin + "</span>" : "");
+      return '<details class="card pend-group" data-pgroup="' + a.key + '"' + (state.pdOpen[a.key] ? " open" : "") + ">" +
+        '<summary><h3>' + esc(a.name) + '</h3><div class="pend-break">' + brk + "</div>" +
+        '<div class="pend-count"><b class="num">' + rows.length + "</b><span>" + (rows.length === 1 ? "pendiente" : "pendientes") + "</span></div>" +
+        '<span class="chev" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg></span></summary>' +
+        '<ul class="ind">' + rows.map(function (r) { return indHTML(r); }).join("") + "</ul></details>";
     }).join("");
     document.getElementById("pd-list").innerHTML = html || '<div class="card empty">No hay pendientes con este filtro.</div>';
   }
@@ -518,7 +545,15 @@ main { max-width: 1240px; margin: 0 auto; padding-block: 24px 44px; padding-inli
     var q = t.closest(".q"); if (q) { q.classList.toggle("open"); return; }
     if (t.closest("#p-close") || t.id === "scrim") return closePanel();
     if (t.closest("#refresh")) return refresh();
+    var pe = t.closest("[data-pexp]");
+    if (pe) {
+      var open = pe.getAttribute("data-pexp") === "1";
+      document.querySelectorAll("[data-pgroup]").forEach(function (d) { d.open = open; state.pdOpen[d.getAttribute("data-pgroup")] = open; });
+    }
   });
+  document.addEventListener("toggle", function (e) {
+    var d = e.target; if (d && d.getAttribute && d.getAttribute("data-pgroup")) state.pdOpen[d.getAttribute("data-pgroup")] = d.open;
+  }, true);
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && state.panelAxis) closePanel(); });
 
   function setMeta(modified, source, label) {
